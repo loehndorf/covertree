@@ -1,7 +1,8 @@
 /**
- * This class provides a Java version of the cover tree nearest neighbor algorithm. It is based on Thomas Kollar's version of "Cover Trees for Nearest
- * Neighbor" by John Langford, Sham Kakade and Alina Beygelzimer. The original algorithm is extended towards selecting K centers 
- * which are maximally different from each other from an online sample.
+ * This class provides a Java version of the cover tree nearest neighbor algorithm.
+ * It is based on Thomas Kollar's version of "Cover Trees for Nearest Neighbor" by 
+ * Langford, Kakade, Beygelzimer (2007). The original algorithm is extended towards
+ * selecting K centers which are maximally different from one another from an online sample.
  * 
  * Date of creation: 2013-02-08
  * Copyright (c) 2013, Nils Loehndorf
@@ -41,14 +42,16 @@ public class CoverTree<E> {
 	boolean hasBounds;
 	double[] min;
 	double[] max;
-	int[] numNodes;
+	int[] numLevels;
+	int maxNumLevels = 500;
+	int minNumLevels = -500;
 	
 	/**
 	 * Create a cover tree at level zero which automatically expands above and below.
 	 */
 	public CoverTree () {
 		this.maxMinLevel = Integer.MIN_VALUE;
-		this.numNodes = new int[1000];
+		this.numLevels = new int[maxNumLevels-minNumLevels];
 		this.base = 1.2;
 	}
 	
@@ -62,7 +65,21 @@ public class CoverTree<E> {
 			this.maxLevel = maxMinLevel;
 			this.minLevel = maxMinLevel;
 		}
-		this.numNodes = new int[1000];
+		this.numLevels = new int[maxNumLevels-minNumLevels];
+	}
+	
+	/**
+	 * Set the minimum levels of the cover tree by defining the maximum exponent of the base (default = 500).
+	 */
+	public void setMaxNumLevels (int max) {
+		maxNumLevels = max;
+	}
+	
+	/**
+	 * Set the minimum levels of the cover tree by defining the minimum exponent of the base (default = -500).
+	 */
+	public void setMinNumLevels (int min) {
+		minNumLevels = min;
 	}
 	
 	/**
@@ -93,11 +110,11 @@ public class CoverTree<E> {
 	}
 	
 	void incNodes(int level) {
-		numNodes[level+500]++;
+		numLevels[level-minNumLevels]++;
 	}
 	
 	void decNodes(int level) {
-		numNodes[level+500]--;
+		numLevels[level-minNumLevels]--;
 	}
 	
 	/**
@@ -108,7 +125,7 @@ public class CoverTree<E> {
 	public int size(int level) {
 		int sum = 0;
 		for (int i=maxLevel; i>=level; i--)
-			sum += numNodes[i+500];
+			sum += numLevels[i-minNumLevels];
 		return sum;
 	}
 	
@@ -123,7 +140,6 @@ public class CoverTree<E> {
 	void insertAtRoot(E element, double[] point) {
 		//inserts the point above the root by successively increaasing the cover of the root node until it
 		//contains the new point, the old root is added as child of the new root
-		//inserts the point above the root node by increasing the maxlevel and replacing the old root with a node that contains the new point as root
 		Node<E> oldRoot = rootNode;
 		double dist = oldRoot.distance(point);
 		while (dist > Math.pow(base,maxLevel)) {
@@ -133,12 +149,10 @@ public class CoverTree<E> {
 			rootNode = newRoot;
 			decNodes(maxLevel);
 			incNodes(++maxLevel);
-			//System.out.println("insert "+rootNode.point+" as root at level "+(maxLevel));
 		}
 		Node<E> newNode = new Node<E>(rootNode,element,point);
 		rootNode.addChild(newNode);
 		incNodes(maxLevel-1);
-		//System.out.println("insert "+point+" below root "+rootNode.point+" at level "+(maxLevel-1));
 	}
 	
 	/**
@@ -180,9 +194,6 @@ public class CoverTree<E> {
 		//if this is the first node make it the root node
 		if (rootNode == null) {
 			rootNode = new Node<E>(null,element,point);
-			//List<Node> newCover = new LinkedList<Node>();
-			//newCover.add(rootNode);
-			//System.out.println("insert "+point+" as root at level "+maxLevel);
 			incNodes(maxLevel);
 			return true;
 		}
@@ -228,7 +239,6 @@ public class CoverTree<E> {
 				break;
 			//select one node of the coverset as the parent of the node
 			for (Node<E> n : coverset) {
-				//dist = n.distance(point);
 				if (n.distance < Math.pow(base,level)) {
 					parent = n;
 					parentLevel = level;
@@ -251,15 +261,10 @@ public class CoverTree<E> {
 			minLevel = parentLevel-1;
 		}
 		//otherwise add child to the tree
-		//System.out.print("regular ");
 		Node<E> newNode = new Node<E>(parent,element,point);
 		parent.addChild(newNode);
 		//record distance to parent node and add to the sorted set of nodes where distance is used for sorting (needed for removal)
 		incNodes(parentLevel-1);
-		//System.out.println("insert "+point+" below "+newNode.parent.point+" at level "+level);
-//		for (int i=maxLevel; i>= minLevel; i--)
-//			System.out.print(size(i)+" ");
-//		System.out.println();
 		return true;
 	}
 	
@@ -268,16 +273,13 @@ public class CoverTree<E> {
 	 */
 	void removeLowestCover() {
 		List<Node<E>> coverset = new LinkedList<Node<E>>();
-//		System.out.println("rootnode: "+rootNode.hashCode());
 		coverset.add(rootNode);
-//		System.out.println(maxLevel+" "+coverset.size());
 		int k = maxLevel;
 		while(k-- > minLevel+1){
 			List<Node<E>> nextCoverset = new LinkedList<Node<E>>();
 			for (Node<E> n : coverset) 
 				nextCoverset.addAll(n.getChildren());
 			coverset = nextCoverset;
-//			System.out.println(k+" "+coverset.size());
 		}
 		for (Node<E> n : coverset) 
 			n.removeChildren();
@@ -291,16 +293,13 @@ public class CoverTree<E> {
 	 */
 	List<Node<E>> removeNodes(int numCenters) {
 		List<Node<E>> coverset = new LinkedList<Node<E>>();
-//		System.out.println("rootnode: "+rootNode.hashCode());
 		coverset.add(rootNode);
-//		System.out.println(size(minLevel+1)+" "+size(minLevel));
 		int k = maxLevel;
 		while(k-- > minLevel+1){
 			List<Node<E>> nextCoverset = new LinkedList<Node<E>>();
 			for (Node<E> n : coverset) 
 				nextCoverset.addAll(n.getChildren());
 			coverset = nextCoverset;
-//			System.out.println(k+" "+coverset.size());
 		}
 		int missing = numCenters-coverset.size();
 		if (missing < 0)
@@ -347,6 +346,11 @@ public class CoverTree<E> {
 		return coverset;
 	}
 	
+	/**
+	 * Retrieve the elemnet from the tree that is nearest to the given point with respect to the Euclidian distance.
+	 * @param point
+	 * @return
+	 */
 	public E getNearest(double[] point) {
 		List<Node<E>> candidates = new LinkedList<Node<E>>();
 		candidates.add(rootNode);
@@ -356,8 +360,10 @@ public class CoverTree<E> {
 			List<Node<E>> newCandidates = new LinkedList<Node<E>>();
 			for (Node<E> n : candidates) {
 				for (Node<E> n2 : n.getChildren()) {
+					//do not compute distances twice
 					if (n.point!=n2.point) {
 						n2.distance = n2.distance(point);
+						//minimum distance can be recorded here
 						if (n2.distance<minDist)
 							minDist = n2.distance;
 					}
@@ -367,20 +373,16 @@ public class CoverTree<E> {
 				}
 			}
 			candidates.clear();
+			//create a set of candidate nearest neighbors
 			for (Node<E> n : newCandidates)
 				if (n.distance < minDist + Math.pow(base,i))
 					candidates.add(n);
 		}
-		//Node nearest = null;
-		//minDist = rootNode.distance;
 		for (Node<E> n : candidates) {
-			if (n.distance == minDist) {
+			if (n.distance == minDist) 
 				return n.element;
-				//minDist = n.distance;
-				//nearest = n;
-			}
 		}
-		return null;//nearest.point;
+		return null;
 	}
 	
 	/**
@@ -389,26 +391,18 @@ public class CoverTree<E> {
 	 * @return
 	 */
 	public List<E> getCover(int level) {
-//		System.out.println(level);
 		List<Node<E>> coverset = new LinkedList<Node<E>>();
-//		System.out.println("rootnode: "+rootNode.hashCode());
 		coverset.add(rootNode);
-//		System.out.println(maxLevel+" "+coverset.size());
 		int k = maxLevel;
-//		System.out.println(maxLevel+" "+level+" "+minLevel);
 		while(k-- > level){
 			List<Node<E>> nextCoverset = new LinkedList<Node<E>>();
 			for (Node<E> n : coverset) 
 				nextCoverset.addAll(n.getChildren());
 			coverset = nextCoverset;
-//			System.out.println(k+" "+coverset.size());
 		}
-//		System.out.println(level+" has size "+coverset.size());
 		List<E> cover = new LinkedList<E>();
-//		System.out.println("get cover: "+coverset.size()+" "+size(level));
 		for (Node<E> n: coverset) {
 			cover.add(n.element);
-//			System.out.println("get cover: "+n.point.hashCode()/1000000);
 		}
 		
 		return cover;
@@ -426,7 +420,6 @@ public class CoverTree<E> {
 		List<E> cover = new LinkedList<E>();
 		for (Node<E> n: coverset) {
 			cover.add(n.element);
-//			System.out.println(n.point[0]+"\t"+n.point[1]);
 		}
 		return cover;
 		
@@ -456,10 +449,6 @@ public class CoverTree<E> {
 			this.children = new LinkedList<Node<E>>();
 			this.element = element;
 			this.point = point;
-//			if (parent!=null)
-//				System.out.println("insert "+Arrays.toString(point)+" ("+this.hashCode()/1000000+") as child of "+Arrays.toString(parent.point)+" ("+parent.hashCode()/1000000+") at level "+level);
-//			else
-//				System.out.println("insert "+Arrays.toString(point)+" ("+this.hashCode()/1000000+") as child of null at level "+level);
 		}
 		
 		Node<E> getParent() {
