@@ -215,7 +215,7 @@ public class CoverTree<E> {
 					}
 					else 
 						n2.distance = n1.distance;
-					if (n2.distance < Math.pow(base,level)) {
+					if (n2.distance <= Math.pow(base,level)) {
 						candidates.add(n2);
 						parentFound = false;
 					}
@@ -227,7 +227,7 @@ public class CoverTree<E> {
 				break;
 			//select one node of the coverset as the parent of the node
 			for (Node<E> n : coverset) {
-				if (n.distance < Math.pow(base,level)) {
+				if (n.distance <= Math.pow(base,level)) {
 					parent = n;
 					parentLevel = level;
 					break;
@@ -363,7 +363,7 @@ public class CoverTree<E> {
 			candidates.clear();
 			//create a set of candidate nearest neighbors
 			for (Node<E> n : newCandidates)
-				if (n.distance < minDist + Math.pow(base,i))
+				if (n.distance <= minDist + Math.pow(base,i))
 					candidates.add(n);
 		}
 		for (Node<E> n : candidates) {
